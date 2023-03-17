@@ -10,7 +10,7 @@ ARG NODE_VERSION="16.17.1"
 ARG YARN_VERSION="1.22.19"
 
 RUN set -ex \
-  && apk add --no-cache curl zip gnupg git jq dpkg
+  && apk add --no-cache curl zip gnupg git jq dpkg bash
 
 RUN mkdir -p /usr/share/maven \
     && curl -Lso  /tmp/maven.tar.gz https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
