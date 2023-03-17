@@ -1,9 +1,16 @@
-FROM adoptopenjdk/openjdk8:jdk8u262-b10
+# Copy of the base Docker image used for Bitbucket CI pipeline
+# Inspired from:
+# Source: https://github.com/Contrast-Security-OSS/maven-yarn-docker/
+# Docker Hub: https://hub.docker.com/r/contrast/maven-yarn
 
-ARG MAVEN_VERSION="3.6.3"
-ARG NODE_VERSION="10.22.1"
-ARG YARN_VERSION="1.17.3"
-ARG DOCKER_MACHINE_VERSION="0.16.0"
+FROM amazoncorretto:17-alpine3.17
+
+ARG MAVEN_VERSION="3.9.0"
+ARG NODE_VERSION="16.17.1"
+ARG YARN_VERSION="1.22.19"
+
+RUN set -ex \
+  && apk add --no-cache curl zip gnupg git jq dpkg
 
 RUN mkdir -p /usr/share/maven \
     && curl -Lso  /tmp/maven.tar.gz https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz \
@@ -14,33 +21,12 @@ RUN mkdir -p /usr/share/maven \
 ENV MAVEN_HOME /usr/share/maven
 ENV MAVEN_CONFIG "/root/.m2"
 
-# install aws-cli
-RUN set -ex \
-  && apt-get update \
-  && apt-get install -y \
-  python-pip \
-  zip \
-  gpg \
-  git \
-  jq
-
-#install aws 2
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-  unzip awscliv2.zip && \
-  ./aws/install && \
-  rm -rf awscliv2.zip
-
 # install node + yarn
 # copied from https://github.com/nodejs/docker-node/blob/master/6.11/stretch/Dockerfile
-RUN groupadd --gid 1000 node \
-  && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
+RUN addgroup -g 1000 node
+#  && adduser --uid 1000 -G node -h "/home/node" --shell /bin/bash
 
-# install helm 
-# copied from https://helm.sh/docs/intro/install/
-RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 \
-  && chmod 700 get_helm.sh \
-  && ./get_helm.sh
-
+  # gpg keys listed at https://github.com/nodejs/node#release-keys
 RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
   && case "${dpkgArch##*-}" in \
   amd64) ARCH='x64';; \
@@ -51,24 +37,19 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
   i386) ARCH='x86';; \
   *) echo "unsupported architecture"; exit 1 ;; \
   esac \
-  # gpg keys listed at https://github.com/nodejs/node#release-keys
   && set -ex \
   && for key in \
-  94AE36675C464D64BAFA68DD7434390BDBE9B9C5 \
-  FD3A5288F042B6850C66B31F09FE44734EB7990E \
-  71DCFD284A79C3B38668286BC97EC7A07EDE3FC1 \
-  DD8F2338BAE7501E3DD5AC78C273792F7D83545D \
-  C4F0DFFF4E8C1A8236409D08E73BC641CC11F4C8 \
-  B9AE9905FFD7803F25714661B63B535A4C206CA9 \
-  77984A986EBC2AA786BC0F66B01FBB92821C587A \
-  8FCCA13FEF1D0C2E91008E09770F7A9A5AE15600 \
   4ED778F539E3634C779C87C6D7062848A1AB005C \
-  A48C2BEE680E841632CD4E44F07496B3EB3C1762 \
-  B9E2F5981AA6E0CD28160D9FF13993A75599653C \
+  141F07595B7B3FFE74309A937405533BE57C7D57 \
+  74F12602B6F1C4E913FAA37AD3A89613643B6201 \
+  DD792F5973C6DE52C432CBDAC77ABFA00DDBF2B7 \
+  8FCCA13FEF1D0C2E91008E09770F7A9A5AE15600 \
+  C4F0DFFF4E8C1A8236409D08E73BC641CC11F4C8 \
+  890C08DB8579162FEE0DF9DB8BEAB4DFCF555EF4 \
+  C82FA3AE1CBEDC6BE46B9360C43CEC45C17AB93C \
+  108F52B48DB57BB0CC439B2997B01419BD92F80A \
   ; do \
-  gpg --batch --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "$key" || \
-  gpg --batch --keyserver hkp://ipv4.pool.sks-keyservers.net --recv-keys "$key" || \
-  gpg --batch --keyserver hkp://pgp.mit.edu:80 --recv-keys "$key" ; \
+  gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key"; \
   done \
   && curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" \
   && curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
@@ -78,14 +59,11 @@ RUN ARCH= && dpkgArch="$(dpkg --print-architecture)" \
   && rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
   && ln -s /usr/local/bin/node /usr/local/bin/nodejs
 
-
 RUN set -ex \
   && for key in \
   6A010C5166006599AA17F08146C2130DFD2497F5 \
   ; do \
-  gpg --batch --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "$key" || \
-  gpg --batch --keyserver hkp://ipv4.pool.sks-keyservers.net --recv-keys "$key" || \
-  gpg --batch --keyserver hkp://pgp.mit.edu:80 --recv-keys "$key" ; \
+  gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key"; \
   done \
   && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz" \
   && curl -fsSLO --compressed "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc" \
@@ -95,6 +73,3 @@ RUN set -ex \
   && ln -s /opt/yarn-v$YARN_VERSION/bin/yarn /usr/local/bin/yarn \
   && ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg \
   && rm yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz
-
-RUN curl -L https://github.com/docker/machine/releases/download/v$DOCKER_MACHINE_VERSION/docker-machine-$(uname -s)-$(uname -m) > /usr/local/bin/docker-machine && \
-  chmod +x /usr/local/bin/docker-machine
