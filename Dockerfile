@@ -18,7 +18,7 @@ ENV NODE_VERSION=${NODE_VERSION}
 ENV YARN_VERSION=${YARN_VERSION}
 
 RUN set -ex \
-  && apk add --no-cache curl zip gnupg git jq dpkg bash g++ make gcc
+  && apk add --no-cache curl zip gnupg git jq dpkg bash g++ make gcc openssh-client
 
 # Install Node
 # Reference: https://github.com/thisismydesign/ruby-node-alpine/blob/e81bf76c7c348b2832480d112d40f13768461297/Dockerfile
@@ -51,7 +51,7 @@ RUN set -ex \
   && mkdir -p /opt \
   && tar -xzf yarn-v${YARN_VERSION}.tar.gz -C /opt/ \
   # Remove the version coming from the node image
-  && rm -rf /usr/local/bin/yarn \     
+  && rm -rf /usr/local/bin/yarn \
   && rm -rf /usr/local/bin/yarnpkg \
   # Use the new version instead
   && ln -s /opt/yarn-v${YARN_VERSION}/bin/yarn /usr/local/bin/yarn \
